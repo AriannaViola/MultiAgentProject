@@ -2,7 +2,7 @@ function res = sim_et_output(cfg, g, Lobs, opt)
 %SIM_ET_OUTPUT  Consenso d'uscita event-triggered con sola misura y_i = C x_i.
 %
 %   Struttura: ogni agente misura solo y_i e ricostruisce x_i con un osservatore
-%   locale (Isidori 5.5); il consenso event-triggered model-based (Garcia) viene
+%   locale; il consenso event-triggered model-based (Garcia) viene
 %   eseguito sulle STIME xhat_i. Si trasmette/modella xhat_i, e il trigger usa
 %   l'errore stima-modello e_i = chi_i - xhat_i. Per C = I si riduce al caso a
 %   stato pieno di sim_event_triggered.
