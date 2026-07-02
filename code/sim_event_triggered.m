@@ -74,7 +74,7 @@ for s = 1:steps
 end
 
 res.t = (0:steps)*dt;
-res.X = X;                              % (n x N x T)
+res.X = X;                             
 res.trig = trig;
 res.counts = cellfun(@numel, trig);
 res.ctrl_updates = ctrl_updates;
