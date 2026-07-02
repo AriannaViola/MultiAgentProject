@@ -1,6 +1,6 @@
 function [t, X] = sim_continuous(cfg, g, c1, dt)
 %SIM_CONTINUOUS  Baseline continua: stessa legge di controllo dell'event-
-%   triggered ma con comunicazione continua (errore di modello e_i == 0).
+%   triggered ma con comunicazione continua (errore di modello e_i = 0).
 %   Dinamica impilata:  dot x = [ I (x) A  -  c1 (L (x) B B' P) ] x .
 if nargin < 4, dt = 1e-3; end
 A = cfg.A; B = cfg.B; L = cfg.L; N = cfg.N; n = g.n;
