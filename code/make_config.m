@@ -3,8 +3,8 @@ function cfg = make_config(name)
 %   cfg = make_config('oscillator')        oscillatore armonico, 5 agenti
 %   cfg = make_config('garcia')            esempio instabile del paper [G], 3 agenti
 %   cfg = make_config('single_integrator') validazione Dimarogonas [D], 5 agenti
-%
-%   Campi di cfg: A,B,C, N, Adj, L, x0, T
+
+
 rng(0);
 switch name
     case 'oscillator'
