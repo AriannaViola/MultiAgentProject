@@ -108,7 +108,7 @@ P_paper = [ 4.8436  5.4783 -1.1082;       % P fornita nel paper [G]
             5.4783  7.0514 -1.4299;
            -1.1082 -1.4299  0.3778];
 g2 = design_gain(cfg2, [], [], P_paper);
-% stessa regola di trigger (Teorema 3 anti-Zeno), cambia SOLO il modello
+% stessa regola di trigger (Teorema 3 anti-Zeno), cambia solo il modello
 em = sim_event_triggered(cfg2, g2, struct('rule','garcia_zeno','model','model','rho',0.5,'phi',0.3));
 ez = sim_event_triggered(cfg2, g2, struct('rule','garcia_zeno','model','zoh','rho',0.5,'phi',0.3));
 fprintf('\n[instabili] trasmissioni model-based=%s (tot %d)\n', mat2str(em.counts(:).'), sum(em.counts));
@@ -159,7 +159,7 @@ xlabel('t [s]'); title('$\mathbf{Observer\ error}\ \|\mathbf{x}_i - \hat{\mathbf
 subplot(1,3,3); semilogy(eo.t, do); grid on;
 xlabel('t [s]'); title('$\mathbf{States\ disagreement}\ \|\mathbf{x} - \bar{\mathbf{x}}\|_F$','Interpreter','latex');
 
-%%  Esperimento 5: confronto COMPUTAZIONALE (comunicazione vs computazione) 
+%%  Esperimento 5: confronto computazionale (comunicazione vs computazione) 
 % (a) single-integrator: l'event-triggered riduce ENTRAMBI gli assi
 cfgS = make_config('single_integrator'); gS = design_gain(cfgS);
 stepsS = round(cfgS.T/1e-3); NS = cfgS.N;
