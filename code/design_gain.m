@@ -4,7 +4,7 @@ function g = design_gain(cfg, theta, q, P_override)
 %   pone  F = -B'P,  c = 1/lambda2(L).  Ritorna struct g con P,F,M,c,lam2,n,m.
 %
 %   P_override: usa una P data invece di risolvere la Riccati
-%   (serve a riprodurre esattamente l'esempio del paper [G]).
+
 if nargin < 2 || isempty(theta), theta = 0.5; end
 if nargin < 3 || isempty(q),     q = 1.0;     end
 A = cfg.A; B = cfg.B; [n,m] = size(B);
