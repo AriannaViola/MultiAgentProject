@@ -1,0 +1,658 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}
+\usepackage[english]{babel}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{placeins}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{caption}
+\allowdisplaybreaks
+\geometry{margin=2.4cm}
+\hypersetup{colorlinks=true,linkcolor=blue!55!black,citecolor=blue!55!black,urlcolor=blue!55!black}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Ni}{\mathcal{N}_i}
+\newcommand{\kron}{\otimes}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\T}{^{\top}}
+
+\title{\textbf{Event-Triggered Consensus for Multi-Agent Systems\\ with General Linear Dynamics}}
+\author{Project 3, \emph{Analysis and Control of Multi-Robot Systems}\\
+Prof.\ Andrea Cristofaro, A.Y.\ 2025/2026\\[4pt]
+Rossella Milici (ID 2208814) \quad Arianna Viola (ID 1868485)}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent We study the consensus problem for a network of $N$ agents with general linear
+dynamics $\dot x_i = Ax_i + Bu_i$, $y_i = Cx_i$, under a \emph{limited-communication}
+constraint: each agent broadcasts its state to its neighbours only when strictly necessary,
+i.e.\ when a local error exceeds a threshold (\emph{event-triggered control}). The goal is to
+reduce communication and computation with respect to continuous control while preserving
+convergence to consensus. The coupling gain is designed through a Riccati inequality
+(Isidori, Ch.~5.4--5.5); a \emph{model-based} protocol with the decentralized triggering rule of
+Garcia, Cao and Casbeer (2014) is adopted, including the variant that excludes Zeno behaviour,
+and the event-triggered scheme is compared in simulation against continuous control. The
+implementation is validated on the single-integrator case (Dimarogonas et al., 2012), and the
+communication advantage of the dynamic model over the zero-order hold is reproduced. The
+communication/convergence trade-off curve obtained by sweeping the threshold parameter
+$\sigma$ is the central comparative result. A dedicated analysis separates the two cost axes,
+\emph{communication} and \emph{computation}, and shows that they do not always move together.
+\end{abstract}
+
+\section{Introduction and problem formulation}
+
+\paragraph{Objective.} In classical consensus every agent updates its control \emph{continuously},
+using the instantaneous information of its neighbours; this requires continuous communication over
+the network. In many applications (embedded microprocessors, limited bandwidth, energy-constrained
+robots) this is not feasible. The event-triggered idea is to keep a broadcast state value
+``frozen'' and to recompute/rebroadcast \emph{only when} the agent has drifted far enough from that
+value. The project asks to (i) design an event-triggered consensus controller for general linear
+dynamics, and (ii) compare it with the classical continuous controller along three axes:
+communication, computation and performance.
+
+\paragraph{Model.} We consider $N$ identical agents
+\begin{equation}
+\dot x_i(t) = A x_i(t) + B u_i(t), \qquad y_i(t) = C x_i(t), \qquad i = 1,\dots,N,
+\label{eq:agent}
+\end{equation}
+with $x_i\in\R^n$, $u_i\in\R^m$, $y_i\in\R^p$ and fixed $A,B,C$. We seek \emph{output consensus}:
+there exists $y_{\mathrm{cons}}(t)$ such that $y_i(t)-y_{\mathrm{cons}}(t)\to 0$ for every $i$. The
+network is described by an undirected connected graph.
+
+\paragraph{Triggering rule (statement).} The basic form of the event condition is
+\begin{equation}
+\norm{e_i(t)} > \sigma\,\norm{x_i(t)}, \qquad e_i(t) = x_i(t_{i,k}) - x_i(t),
+\label{eq:sigma}
+\end{equation}
+where $t_{i,k}$ is the last trigger instant of agent $i$ and $\sigma>0$ tunes the
+communication/performance trade-off. As discussed in \S\ref{sec:sigma}, this rule is adequate for
+the single-integrator case but must be extended for general linear dynamics.
+
+\section{Background: graph theory and continuous consensus}
+
+\subsection{Laplacian and connectivity}
+For an undirected graph with adjacency matrix $\mathcal A=[a_{ij}]$ ($a_{ij}=1$ if $i,j$ are
+adjacent) and degrees $d_i=\sum_j a_{ij}$, the \emph{Laplacian} is $L=D-\mathcal A$, with
+$D=\mathrm{diag}(d_i)$ and
+\[
+(Lx)_i = \sum_{j\in\Ni} a_{ij}(x_i - x_j).
+\]
+Two facts drive everything that follows. First, $L$ is symmetric, so it is orthogonally
+diagonalizable, $L=T\Lambda T\T$ with $T\T T=I$ and $\Lambda=\mathrm{diag}(\lambda_1,\dots,\lambda_N)$;
+its eigenvalues are real. Second, for any $x=[x_1\T,\dots,x_N\T]\T$ the associated quadratic form is
+the \emph{disagreement energy}
+\begin{equation}
+x\T (L\kron I_n)\, x = \tfrac12\sum_{i}\sum_{j\in\Ni} a_{ij}\,\norm{x_i-x_j}^2 \ \ge\ 0,
+\label{eq:quadform}
+\end{equation}
+which is zero if and only if $x_i=x_j$ for all connected pairs. Hence $L\succeq 0$, and on a
+connected graph the null space is exactly the \emph{consensus subspace}
+$\ker L = \mathrm{span}\{\mathbf 1\}$, so $L\mathbf 1=0$ and the eigenvalues order as
+$0=\lambda_1\le\lambda_2\le\cdots\le\lambda_N$. The multiplicity of the zero eigenvalue equals the
+number of connected components; therefore the graph is connected $\iff \lambda_2>0$ (the
+\emph{Fiedler value}, or algebraic connectivity). A larger $\lambda_2$ means a ``better connected''
+network and, as shown below, faster consensus. Crucially, $\lambda_2$ is the only \emph{global}
+quantity the design needs: it fixes the minimum coupling gain $c\ge 1/\lambda_2$, and it is computed
+once, off-line; the run-time protocol uses only local sums $(Lx)_i$.
+
+\subsection{Continuous protocol and gain design (Riccati)}
+With continuous relative information the control is
+\begin{equation}
+u_i = cF\sum_{j\in\Ni}(x_i - x_j), \qquad F = -B\T P, \qquad c \ge 1/\lambda_2,
+\label{eq:ucont}
+\end{equation}
+where $P\succ 0$ solves the Riccati inequality (with $\theta>0$)
+\begin{equation}
+PA + A\T P - 2PBB\T P + 2\theta P < 0.
+\label{eq:riccati}
+\end{equation}
+This is the observer-free design of Isidori (Ch.~5.5). In stacked (Kronecker) form the closed loop
+reads
+\begin{equation}
+\dot x = \big[I_N\kron A - c\,(L\kron BB\T P)\big]x .
+\label{eq:kron}
+\end{equation}
+
+\paragraph{Decoupling by eigenvalue.} Because $L=T\Lambda T\T$ is symmetric, the change of
+coordinates $\xi=(T\T\kron I_n)\,x$ block-diagonalizes \eqref{eq:kron}: using
+$(T\T\kron I)(L\kron BB\T P)(T\kron I)=\Lambda\kron BB\T P$, the $Nn$-dimensional system splits into
+$N$ \emph{independent} $n$-dimensional modes
+\begin{equation}
+\dot\xi_i = \big(A - c\,\lambda_i\,BB\T P\big)\xi_i, \qquad i=1,\dots,N.
+\label{eq:modes}
+\end{equation}
+These modes carry a clean physical meaning:
+\begin{itemize}\itemsep2pt
+\item \textbf{Consensus mode} ($i=1$, $\lambda_1=0$): $\dot\xi_1=A\xi_1$. This is the component along
+$\mathbf 1$; it is \emph{not} required to be stable, since it \emph{is} the common trajectory that all
+agents follow. Its free evolution $\xi_1(t)=e^{At}\xi_1(0)$ is exactly the reason the consensus value
+is $Ce^{At}x^\circ$ rather than a constant.
+\item \textbf{Disagreement modes} ($i\ge 2$, $\lambda_i>0$): these must be Hurwitz for the
+inter-agent differences to vanish, i.e.\ for consensus to occur.
+\end{itemize}
+
+\paragraph{Why the Riccati gain works.} Fix a disagreement mode $i\ge 2$ and take the Lyapunov
+function $V_i=\xi_i\T P\xi_i>0$. Along \eqref{eq:modes},
+\begin{equation}
+\dot V_i = \xi_i\T\!\big[PA+A\T P - 2c\lambda_i\,PBB\T P\big]\xi_i .
+\label{eq:Vi}
+\end{equation}
+Since $c\lambda_i\ge c\lambda_2\ge 1$ and $PBB\T P\succeq 0$, we have
+$-2c\lambda_i PBB\T P\preceq -2PBB\T P$, so by the Riccati inequality \eqref{eq:riccati}
+\begin{equation}
+\dot V_i \le \xi_i\T\big(PA+A\T P-2PBB\T P\big)\xi_i < -2\theta\,\xi_i\T P\xi_i = -2\theta V_i .
+\label{eq:expo}
+\end{equation}
+Thus every disagreement mode decays at least as fast as $e^{-\theta t}$, and $A-c\lambda_i BB\T P$ is
+Hurwitz. The single scalar condition $c\ge 1/\lambda_2$ makes this hold \emph{simultaneously} for all
+$i\ge 2$ (the binding case is the smallest positive eigenvalue $\lambda_2$). The reduction of a
+network stability problem to $N-1$ decoupled Hurwitz conditions indexed by the Laplacian eigenvalues
+is the structural backbone of the whole design, and $\theta$ sets a guaranteed convergence rate.
+
+\begin{remark}
+For general $A$ the consensus value is \emph{not} a constant, nor the plain average: the states
+converge along a free trajectory $y_{\mathrm{cons}}(t)=Ce^{At}x^\circ$, with $x^\circ$ a linear
+function of \emph{all} the initial conditions. The initial average is recovered only in the
+single-integrator case ($A=0$) on a balanced graph.
+\end{remark}
+
+\section{Model-based event-triggered protocol}
+
+\subsection{Decoupled models and error}
+Instead of holding the last received value constant (zero-order hold, ZOH), each agent propagates
+a \emph{model} of the decoupled neighbour dynamics:
+\begin{equation}
+\dot y_i(t) = A\,y_i(t), \quad t\in[t_{i,k},t_{i,k+1}), \qquad y_i(t_{i,k}) = x_i(t_{i,k}).
+\label{eq:model}
+\end{equation}
+When agent $i$ triggers, it broadcasts $x_i(t_{i,k})$ to its neighbours and everyone resets
+$y_i\!\leftarrow\!x_i$; since the models share $A$ and the same resets, the copies of $y_i$ held by
+all agents coincide. We define the model error and the local disagreement signal (both locally
+measurable):
+\begin{equation}
+e_i = y_i - x_i, \qquad z_i = \sum_{j\in\Ni}(y_i - y_j).
+\end{equation}
+The event-triggered control uses the models:
+\begin{equation}
+u_i = c_1 F z_i, \qquad c_1 = c + c_2, \quad c_2>0.
+\label{eq:uet}
+\end{equation}
+For $A=0$ the model \eqref{eq:model} degenerates into a ZOH, recovering the single-integrator
+protocol of Dimarogonas et al.
+
+\paragraph{Why a dynamic model, not a hold: the error dynamics.} The decisive difference between the
+two schemes is visible in the dynamics of the model error $e_i=y_i-x_i$. Between two events, with the
+dynamic model \eqref{eq:model},
+\begin{equation}
+\dot e_i = \dot y_i - \dot x_i = A y_i - (A x_i + B u_i) = A\,e_i - B u_i .
+\label{eq:err-model}
+\end{equation}
+The error is driven \emph{only} by the input term $Bu_i$, and $u_i=c_1Fz_i\to 0$ as consensus is
+approached; hence $e_i$ stays small and events become rare. Holding the last value instead
+($\dot y_i=0$, i.e.\ assuming $A=0$) gives
+\begin{equation}
+\dot e_i = -\dot x_i = -A x_i - B u_i ,
+\label{eq:err-zoh}
+\end{equation}
+now driven by the whole free term $A x_i$, which is large (and divergent when $A$ is unstable)
+even far from consensus. The threshold is then crossed almost immediately, so the ZOH triggers
+continuously and may even exhibit Zeno behaviour. This is Garcia's key observation: \emph{holding the
+last value is the same as assuming $A=0$}, which is exact only for the single integrator. Replacing
+the held value with the decoupled model $\dot y_i=Ay_i$ is precisely the fix that makes
+event-triggering effective for general (even unstable) dynamics.
+
+\subsection{Decentralized triggering rule and convergence}
+\label{sec:mb-conv}
+Let $M = PBB\T P$. The event condition for agent $i$ is
+\begin{equation}
+\psi_i > \rho\, z_i\T \Sigma_i z_i,
+\label{eq:trig}
+\end{equation}
+with $0<\rho<1$ (the $\sigma$ parameter) and, setting $d_i=|\Ni|$ and $b_i>0$,
+\begin{align}
+\psi_i &= 2(c_2-c)d_i\, z_i\T M e_i
++ \Big[2cd_i^2(1+b_i) + \tfrac{c_2-c}{b_i}d_i + cd_i(N-1)\big(b_i+\tfrac{3}{b_i}\big)\Big] e_i\T M e_i,
+\label{eq:psi}\\
+\Sigma_i &= \big(2c_2 - b_i d_i (c_2-c)\big)\,PBB\T P.
+\label{eq:Sigma}
+\end{align}
+All quantities in \eqref{eq:trig} to \eqref{eq:Sigma} are \emph{local}, so the rule is fully
+decentralized: no agent needs global information beyond the design constant $\lambda_2$.
+
+\paragraph{Where the rule comes from.} The structure of \eqref{eq:trig} is dictated by the network
+Lyapunov function $V=x\T(L\kron P)x$ of \S\ref{sec:mb-conv}. Differentiating $V$ along the
+model-based closed loop and substituting $x_i=y_i-e_i$ produces two kinds of terms: a
+\emph{nominal} part $x\T\bar L x\preceq 0$ (the same one that gives continuous consensus) plus
+\emph{error-induced} terms that depend on the model errors $e_i$. Collecting the latter,
+$\psi_i$ in \eqref{eq:psi} is exactly the sum of the degradation caused by $e_i$: a bilinear part
+$2(c_2-c)d_i\,z_i\T M e_i$ (a cross term in $z_i$ and $e_i$) and a quadratic part $(\cdots)\,e_i\T M e_i$;
+the coefficients follow from Young's inequality with free parameters $b_i>0$, which is why $b_i$
+appears in both $\psi_i$ and $\Sigma_i$. The quadratic form $z_i\T\Sigma_i z_i$ in \eqref{eq:Sigma}
+is the \emph{margin} that the nominal decrease makes available. Triggering when
+$\psi_i>\rho\,z_i\T\Sigma_i z_i$ keeps the damage below a fraction $\rho<1$ of the margin, so a net
+negative $\dot V$ is preserved. At an event the model is reset, $e_i\to 0$, hence $\psi_i\to 0$: the
+inequality is satisfied with room to spare, and a new inter-event interval begins.
+
+\begin{theorem}[Asymptotic consensus]
+If $(A,B)$ is controllable, the graph is undirected and connected, $F=-B\T P$, $c\ge1/\lambda_2$
+and $c_2>0$, then the agents \eqref{eq:agent} with control \eqref{eq:uet} reach asymptotic
+consensus whenever events are generated according to \eqref{eq:trig}.
+\end{theorem}
+
+\emph{Proof sketch.} With $\hat L = L\kron P$ take $V = x\T\hat L x\ge 0$. Along trajectories one
+gets $\dot V = x\T\bar L x + \sum_i\!\big[(b_id_i(c_2-c)-2c_2)z_i\T M z_i + \psi_i\big]$, with
+$\bar L = \hat L A_c + A_c\T\hat L \preceq 0$ (Theorem~1 of \cite{garcia2014}: $-\bar L$ has the
+same $n$ null eigenvalues as $\hat L$, the others negative). At an event
+$e_i\!\to\!0\Rightarrow\psi_i\!\to\!0$; enforcing \eqref{eq:trig} gives
+$\psi_i\le\rho z_i\T\Sigma_i z_i$, hence
+$\dot V \le x\T\bar L x + \sum_i(\rho-1)z_i\T\Sigma_i z_i \le x\T\bar L x \le 0$, from which
+consensus follows. \hfill$\square$
+
+\subsection{Zeno behaviour and its exclusion}
+Rule \eqref{eq:trig} guarantees convergence but not strictly positive inter-event times. The reason
+is structural: $\Sigma_i\propto PBB\T P$ has rank at most $m=\mathrm{rank}\,B$, so when $B$ is thin
+(here a single input column) $\Sigma_i$ is only positive \emph{semidefinite}. Hence $z_i\T\Sigma_i
+z_i$ can vanish for $z_i\neq 0$; the threshold then collapses to zero and any $\psi_i>0$ would
+trigger instantly, producing an accumulation of events in finite time (\emph{Zeno}). The remedy is to
+raise the threshold by a strictly positive constant $\phi>0$:
+\begin{equation}
+\psi_i > \rho\, z_i\T\Sigma_i z_i + \phi.
+\label{eq:trigZeno}
+\end{equation}
+
+\begin{theorem}[Bounded consensus, anti-Zeno]
+Under the assumptions of Theorem~1 and with rule \eqref{eq:trigZeno}, the agents reach
+\emph{bounded consensus}
+\[
+\lim_{t\to\infty}\norm{x_i(t)-x_j(t)}^2 \le \frac{N\phi}{\eta\,\lambda_{\min}(P)},
+\qquad \eta = \frac{\lambda_{\min\neq 0}(-\bar L)}{\lambda_{\max}(\hat L)}>0,
+\]
+and the inter-event times are lower-bounded by some $\tau_i>0$ (no Zeno).
+\end{theorem}
+
+\emph{Proof idea (no Zeno).} Immediately after an event $e_i(t_{i,k})=0$. Between events $e_i$ obeys
+\eqref{eq:err-model}, $\dot e_i=Ae_i-Bu_i$, so $\norm{e_i}$ grows at a bounded rate and $\psi_i$,
+being a quadratic form in $e_i$ that vanishes at $e_i=0$, grows continuously from $0$. To violate
+\eqref{eq:trigZeno} it must first exceed the strictly positive floor $\phi$; this requires a finite
+growth of $\norm{e_i}$ and therefore a strictly positive time $\tau_i>0$. A uniform lower bound on
+the inter-event interval follows, exactly as in the single-integrator case where it is explicit,
+$\tau=\sigma/(\norm{L}(1+\sigma))$.
+
+\emph{Proof idea (the bound).} With $V=x\T(L\kron P)x$, enforcing \eqref{eq:trigZeno} leaves an extra
+$+N\phi$ compared with Theorem~1, giving $\dot V\le x\T\bar L x + N\phi \le -\eta\,V + N\phi$, where
+$-\bar L\succeq \eta\,(L\kron P)$ on the disagreement subspace defines $\eta>0$. Thus $V$ decays until
+$V\le N\phi/\eta$ and stays there; converting the $P$-weighted bound into the Euclidean disagreement
+through $\lambda_{\min}(P)$ yields the stated inequality. \hfill$\square$
+
+The constant $\phi$ therefore offers a further explicit trade-off: large $\phi$ reduces communication
+but enlarges the consensus radius $\propto\sqrt{\phi}$; $\phi\!\to\!0$ recovers the asymptotic
+behaviour of Theorem~1 (at the price of losing the guaranteed dwell time). This is the mechanism
+behind the residual plateau observed on the unstable agents in \S\ref{sec:unstable}.
+
+\section{The $\sigma$-rule and the single-integrator case}
+\label{sec:sigma}
+
+\paragraph{Continuous first-order agreement.} The single integrator $\dot x_i=u_i$ with
+$u_i=-\sum_{j\in\Ni}(x_i-x_j)$ gives the closed loop $\dot x=-Lx$. On an undirected connected graph
+the states converge to the \emph{initial average} $\bar x=\tfrac1N\sum_k x_k(0)$. The proof is short
+and worth stating, because it explains why the single integrator is special. The average
+$\bar x(t)=\tfrac1N\mathbf 1\T x$ is invariant:
+\begin{equation}
+\tfrac{d}{dt}\big(\mathbf 1\T x\big) = \mathbf 1\T\dot x = -\mathbf 1\T L x = -(L\mathbf 1)\T x = 0,
+\label{eq:avg-inv}
+\end{equation}
+using $L=L\T$ and $L\mathbf 1=0$; meanwhile the disagreement modes ($\lambda_i>0$) decay, so
+$x_i\to\bar x(0)$.
+\begin{remark}
+Invariance \eqref{eq:avg-inv} relies on $\mathbf 1\T L=0$, i.e.\ on an \emph{undirected or balanced}
+graph. On a general unbalanced digraph the states still agree but on a \emph{weighted} average given
+by the left zero eigenvector of $L$, not on the plain mean. This is a common conceptual pitfall.
+\end{remark}
+
+\paragraph{Event-triggered version (Dimarogonas).} Sampling the state and holding the control gives
+\begin{equation}
+u(t) = -L\,x(t_k), \qquad t\in[t_k,t_{k+1}), \qquad e(t)=x(t_k)-x(t),
+\label{eq:dima-et}
+\end{equation}
+so that $\dot x=-L(x+e)=-Lx-Le$. With the ISS Lyapunov function $V=\tfrac12 x\T L x$ (the
+disagreement energy, $V=0\iff$ consensus on a connected graph),
+\begin{equation}
+\dot V = -\norm{Lx}^2-(Lx)\T Le \le -\norm{Lx}^2+\norm{L}\,\norm{e}\,\norm{Lx}.
+\end{equation}
+Enforcing the relative threshold $\norm{e}\le\sigma\,\norm{Lx}/\norm{L}$ yields
+\begin{equation}
+\dot V \le (\sigma-1)\,\norm{Lx}^2,
+\end{equation}
+which is negative for $0<\sigma<1$: this is exactly the input-to-state-stability of $\dot x=-Lx$
+with respect to the measurement error $e$, the property the event-triggered design exploits. The
+event fires when $\norm{e}=\sigma\norm{Lx}/\norm{L}$, at which point $e$ is reset to zero; a
+strictly positive inter-event time
+\begin{equation}
+\tau = \frac{\sigma}{\norm{L}\,(1+\sigma)} > 0
+\label{eq:dima-dwell}
+\end{equation}
+excludes Zeno. This is the base case of \eqref{eq:model} to \eqref{eq:trig} with $A=0$: the model is a
+ZOH, and \eqref{eq:err-zoh} reduces to $\dot e=-Bu$ with no divergent free term.
+
+\paragraph{Why the $\sigma$-rule does not extend.} For general linear dynamics $\norm{x_i}$ does not
+decay (it may even grow for unstable $A$), so the absolute threshold $\sigma\norm{x_i}$ does not
+contract and, as \eqref{eq:err-zoh} shows, the ZOH error is driven by $Ax_i$: communication is not
+reduced over time and Zeno may be unavoidable. This is precisely why the project adopts the
+model-based protocol with rule \eqref{eq:trig} to \eqref{eq:trigZeno}, which depends on the
+\emph{relative} model signal $z_i$ rather than on the absolute state norm.
+
+\section{Implementation and results}
+
+\paragraph{Numerical setup.} The implementation (MATLAB) integrates both the true dynamics and the
+models with fixed-step RK4 at $\Delta t=10^{-3}$, checking the event condition at every step; the
+seed \texttt{rng(0)} is used throughout for reproducibility. The metrics computed are: number of
+triggers per agent, convergence time (first instant at which the disagreement norm falls below
+$10^{-2}$ of its initial value), the inter-event time distribution, and the sweep over $\sigma$.
+Three cases are studied, followed by an output-only extension.
+
+\subsection{Experiment 1: oscillator (marginally stable LTI)}
+Five agents with $A=\begin{psmallmatrix}0&1\\-1&0\end{psmallmatrix}$,
+$B=\begin{psmallmatrix}0\\1\end{psmallmatrix}$, $C=[1\ 0]$ (output $=$ position), on a $5$-cycle with
+one chord, so that $\lambda_2=1.382$, $c=1/\lambda_2=0.724$ and $c_1=1.5/\lambda_2=1.085$. Four
+figures characterise this experiment: the convergence, the synchronised trajectories, the triggering
+pattern, and the trade-off curve.
+
+\paragraph{Convergence (Fig.~\ref{fig:conv}).} The figure plots the disagreement norm
+$\norm{\cdot}_F$ on a \emph{logarithmic} vertical axis against time, for the continuous law (solid)
+and the event-triggered law (dashed). Both curves are essentially straight lines: the disagreement
+decays \emph{exponentially}, exactly as the mode-wise bound \eqref{eq:expo} predicts. The two curves
+are almost superimposed, the event-triggered one lying slightly above; it reaches the $1\%$ tolerance
+at $t_{\mathrm{conv}}=4.87$~s against $4.55$~s for the continuous baseline, a penalty of about
+$7\%$. The small, roughly constant vertical gap between the two lines is the persistent price of the
+model error $e_i$ that accumulates between consecutive events, consistent with \eqref{eq:err-model}.
+The reading is therefore: near-identical convergence, obtained with $918$ transmissions instead of
+the continuous exchange of the baseline.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.66\textwidth]{figs/fig_convergence.png}
+\caption{Disagreement norm (log scale) versus time: continuous (solid) and event-triggered (dashed).
+Both decay exponentially; the event-triggered curve sits slightly above, reaching the tolerance at
+$4.87$~s against $4.55$~s. The gap is the cost of the model error $e_i$ between events.}
+\label{fig:conv}
+\end{figure}
+
+\paragraph{Synchronised states and outputs (Fig.~\ref{fig:states}).} The left panel shows the first
+state component $x_{i,1}(t)$ of the five agents, the right panel their outputs $y_i=Cx_i$. The
+trajectories start widely spread (from about $+7$ to $-9$) and, within roughly five seconds, lock
+onto a single \emph{common oscillation} of amplitude $\approx 4$ and period $2\pi$ (the natural
+period of $A$). Two theoretical points are confirmed here. First, the agents agree on a shared
+\emph{trajectory}, not on a constant: this is the free response $Ce^{At}x^\circ$ of Remark~1, the
+hallmark of general $A$. Second, because $C=[1\ 0]$ selects the position, the outputs panel coincides
+with the state panel, so output consensus is attained. The brief overshoot before locking is the
+transient of the second-order oscillatory modes.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{figs/fig_states.png}
+\caption{States $x_{i,1}$ (left) and outputs $y_i=Cx_i$ (right) under event-triggered control. The
+five trajectories start spread out and lock onto a common oscillation of amplitude $\approx4$ within
+about five seconds; the output panel coincides with the state panel because $C$ selects the position.}
+\label{fig:states}
+\end{figure}
+
+\paragraph{Triggering pattern and inter-event times (Fig.~\ref{fig:events}).} The figure has three
+panels. The left one is the \emph{raster} of transmission instants: each vertical tick is an event,
+one row per agent, over the whole horizon. Events are dense during the initial transient ($t<4$~s,
+when the disagreement is large) and thin out as consensus is approached; crucially they are
+\emph{asynchronous} across agents, so there is no common clock and the scheme is genuinely
+decentralised. The centre panel zooms on $[0,3]$~s to make the individual events legible. The right
+panel is the histogram of inter-event times $\tau$: the mass concentrates around $\approx 0.11$~s
+(the mean) and, above all, lies entirely to the \emph{right} of the red line $\tau_{\min}>0$. This
+strictly positive minimum inter-event time is the numerical confirmation of the no-Zeno property, the
+dwell time guaranteed by Theorem~2. Over the five agents there are $918$ transmissions in total (per
+agent $198,180,178,180,182$), a nearly uniform split because the agents are identical and almost
+symmetric on the graph.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figs/fig_triggers.png}
+\caption{Left: raster of trigger instants per agent over the full horizon (dense in the transient,
+sparse near consensus, asynchronous across agents). Centre: zoom on $[0,3]$~s. Right: histogram of
+inter-event times, whose mass sits well to the right of $\tau_{\min}>0$ (no Zeno).}
+\label{fig:events}
+\end{figure}
+
+\paragraph{The $\sigma$ trade-off (Fig.~\ref{fig:sweep}).} This is the central comparative result.
+The threshold parameter $\rho$ (the $\sigma$ knob) is swept from $0.1$ to $0.9$ and two quantities are
+tracked. The blue curve (left axis) is the total number of triggers, which falls monotonically from
+$1891$ to $649$ as the threshold is loosened; the orange curve (right axis) is the convergence time,
+which rises monotonically from $4.68$~s to $5.017$~s. The two opposite monotone trends make the
+communication versus performance trade-off explicit and quantitative: a single scalar buys network
+savings at the price of speed. The trigger curve is \emph{convex}, i.e.\ there are diminishing
+returns: the first increments of $\rho$ eliminate many events, later ones progressively fewer. The
+nominal operating point $\rho=0.5$ sits mid-curve at $\approx 918$ triggers and $\approx 4.87$~s,
+which cross-checks the sweep against the convergence experiment above.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.62\textwidth]{figs/fig_sweep.png}
+\caption{Communication/convergence trade-off versus $\rho$ (the $\sigma$ parameter): total triggers
+(blue, left axis, $1891\!\to\!649$) and convergence time (orange, right axis, $4.68\!\to\!5.017$~s).
+The two curves are monotone in opposite directions; the operating point $\rho=0.5$ gives $918$
+triggers and $4.87$~s.}
+\label{fig:sweep}
+\end{figure}
+
+\subsection{Experiment 2: unstable agents, model-based versus ZOH}
+\label{sec:unstable}
+We reproduce the example of \cite{garcia2014}: three third-order agents with unstable dynamics on a
+path graph (nodes $1,2,3$), under the anti-Zeno rule \eqref{eq:trigZeno}. The triggering rule
+is kept identical for the two controllers; only the between-event model differs, the dynamic model
+\eqref{eq:model} against a ZOH ($\dot y_i=0$).
+
+\paragraph{Disagreement and communication (Fig.~\ref{fig:mvz}).} The figure has two panels that
+together tell the whole story. The left panel is the disagreement on a logarithmic axis: both schemes
+decay together during the transient, then the model-based curve (solid) settles on a \emph{plateau}
+at $\approx 2\times10^{-2}$, while the ZOH curve (dashed) keeps decreasing to $\approx 10^{-5}$. The
+right panel counts the transmissions per agent: the model-based bars ($55,68,57$) are barely visible
+next to the ZOH bars ($6793,7440,6723$). Read together, the panels quantify the decisive advantage of
+the predictive model: it reaches \emph{bounded} consensus with only $180$ transmissions in total,
+whereas the ZOH triggers $20\,956$ times, that is, essentially continuous communication. The reason
+is \eqref{eq:err-zoh}: on unstable dynamics the held value drifts almost immediately, the model error
+explodes, and events pile up; the dynamic model instead follows the free dynamics and communicates
+only to correct the small input-induced drift.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\textwidth]{figs/fig_model_vs_zoh.png}
+\caption{Unstable agents. Left: disagreement on a log axis; the model-based scheme (solid) reaches
+the bounded-consensus plateau of Theorem~2 at $\approx2\times10^{-2}$, while the ZOH (dashed) decays
+lower but communicates almost continuously. Right: transmissions per agent; the model-based bars
+($55,68,57$) are negligible next to the ZOH bars ($6793,7440,6723$).}
+\label{fig:mvz}
+\end{figure}
+
+\begin{remark}
+In the left panel of Fig.~\ref{fig:mvz} the model-based residual settles slightly \emph{higher} than
+the ZOH curve. This is not a defect. Under the anti-Zeno rule the model-based scheme deliberately
+accepts a bounded disagreement (the Theorem~2 ball set by $\phi$) in exchange for very few
+transmissions, whereas the ZOH attains a lower residual only by communicating almost continuously.
+The plateau height is therefore a design choice, not an error.
+\end{remark}
+
+\subsection{Validation: single-integrator (Dimarogonas)}
+Five single integrators ($A=0,B=C=1$) with rule \eqref{eq:trig}. The states converge \emph{exactly}
+to the initial average ($\bar x(0)=1.29364$; final states all equal to $1.2936$ up to $10^{-9}$),
+confirming the correctness of the implementation on this known case, in agreement with the
+mean-invariance property \eqref{eq:avg-inv}. The event-triggered scheme uses $451$ transmissions in
+total (see \S\ref{sec:comp}), against the continuous baseline; the corresponding communication and
+computation counts are reported and discussed in Fig.~\ref{fig:comp} below.
+
+\subsection{Communication versus computation}
+\label{sec:comp}
+The project asks for a comparison not only of performance but also of the \emph{computational} cost.
+We distinguish two resources: \emph{communication} (number of transmissions on the network) and
+\emph{computation} (number of control recomputations, i.e.\ instants at which $u_i$ changes value).
+In continuous control both are proportional to the number of steps, because the control is updated at
+every instant. These two axes do \emph{not} always move together, and Fig.~\ref{fig:comp} together
+with Table~\ref{tab:comp} shows exactly when they diverge.
+
+\paragraph{Single-integrator, both axes reduced (Fig.~\ref{fig:comp}).} The figure is a grouped bar
+chart on a logarithmic count axis, blue for communication and orange for computation, for the
+continuous and the event-triggered controllers. For the continuous law the two bars are equal and
+maximal ($75\,000$ each): the control is transmitted and recomputed at every step. For the
+event-triggered law both bars collapse, communication to $451$ (about $166\times$ fewer) and
+computation to $1430$ (about $52\times$ fewer). One detail is worth reading off the chart: the
+computation bar ($1430$) is taller than the communication bar ($451$). The reason is that a single
+broadcast by agent $i$ forces a control recomputation not only at $i$ but also at each of its
+neighbours, whose signal $z_i$ changes; with average degree $\approx 2$ this gives about three
+recomputations per transmission. This is the ideal case $A=0$, where the held model is exact
+(\S\ref{sec:sigma}) and event-triggering wins on both axes at once.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.52\textwidth]{figs/fig_computation.png}
+\caption{Single-integrator, communication and computation on a logarithmic count axis (blue $=$
+communication, orange $=$ computation). Continuous updates both $75\,000$ times; event-triggering
+drops communication to $451$ and computation to $1430$. Computation exceeds communication because
+each broadcast triggers a recomputation at the sender and at its neighbours.}
+\label{fig:comp}
+\end{figure}
+
+\paragraph{General dynamics, the two axes separate.} For general LTI the model-based control depends
+on the models, which evolve \emph{continuously}, so $u_i$ changes at every instant even between
+events. Table~\ref{tab:comp} compares three strategies on the oscillator. The model-based scheme
+collapses communication ($918$ against $100\,000$) but leaves computation unchanged ($100\,000$).
+Holding the control constant between events (ZOH) instead reduces computation ($71\,520$), but on
+oscillatory dynamics the model error grows fast and communication explodes ($76\,550$), so the main
+advantage is lost.
+
+\begin{table}[H]
+\centering
+\caption{Communication and computation on the oscillator (horizon $T=100$~s, $\Delta t=10^{-3}$).}
+\label{tab:comp}
+\begin{tabular}{lcc}
+\toprule
+Controller & Communication & Computation \\
+\midrule
+Continuous           & $100\,000$ & $100\,000$ \\
+ET model-based       & $918$      & $100\,000$ \\
+ET held control (ZOH)& $76\,550$  & $71\,520$  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This yields a design criterion. The \emph{model-based} scheme is preferable when the bottleneck is
+the network (bandwidth, transmission energy) and on-board computation is cheap. The \emph{held
+control} is preferable when the limit is the processor or actuator, but only if events stay sparse
+(stable dynamics), as in the single integrator. The unstable case of Fig.~\ref{fig:mvz} is the
+extreme: there the ZOH degenerates into de facto continuous communication.
+
+\FloatBarrier
+\section{Output consensus with output-only measurement (observer-based)}
+\label{sec:output}
+In the previous cases the full state is transmitted. We now consider the case in which each agent
+measures \emph{only} the output $y_i = Cx_i$ (with $(A,C)$ observable). The solution combines the
+observer-based structure of Isidori (Ch.~5.5) with the model-based event-triggered consensus: each
+agent reconstructs its own state with a local observer and consensus is run on the \emph{estimates}.
+
+\paragraph{Local observer.} Each agent runs
+\begin{equation}
+\dot{\hat x}_i = A\hat x_i + B u_i + L_{\mathrm{obs}}\,(y_i - C\hat x_i),
+\label{eq:obs}
+\end{equation}
+with $L_{\mathrm{obs}}$ chosen so that $A-L_{\mathrm{obs}}C$ is Hurwitz (possible since $(A,C)$ is
+observable). Subtracting \eqref{eq:obs} from \eqref{eq:agent} the input term cancels:
+\begin{equation}
+\dot{\tilde x}_i = (Ax_i+Bu_i)-\big(A\hat x_i+Bu_i+L_{\mathrm{obs}}C\tilde x_i\big)
+= (A-L_{\mathrm{obs}}C)\,\tilde x_i .
+\label{eq:obs-err}
+\end{equation}
+The estimation error $\tilde x_i=x_i-\hat x_i$ therefore obeys an \emph{autonomous} stable equation
+and decays to zero independently of the consensus dynamics, which is the observer half of the
+separation argument. For the oscillator with $C=[1\ 0]$ and $L_{\mathrm{obs}}=[\ell_1\ \ell_2]\T$,
+\[
+A-L_{\mathrm{obs}}C=\begin{psmallmatrix}-\ell_1 & 1\\ -1-\ell_2 & 0\end{psmallmatrix},
+\qquad \det(sI-(A-L_{\mathrm{obs}}C))=s^2+\ell_1 s+(1+\ell_2);
+\]
+matching the target $(s+3)(s+4)=s^2+7s+12$ gives $\ell_1=7$, $\ell_2=11$, i.e.\ poles $\{-3,-4\}$,
+deliberately faster than the consensus dynamics so that the estimate is accurate before consensus
+takes effect.
+
+\paragraph{Event-triggered consensus on the estimates.} The estimate $\hat x_i$ is
+transmitted/modelled through $\chi_i$ ($\dot\chi_i = A\chi_i$, reset
+$\chi_i\!\leftarrow\!\hat x_i$ at an event), and the control is
+\begin{equation}
+u_i = c_1 F z_i,\qquad z_i = \sum_{j\in\Ni}(\chi_i - \chi_j),
+\end{equation}
+with the same triggering rule \eqref{eq:trig} applied to the model error
+$e_i = \chi_i - \hat x_i$. Two error sources are thus separated: the \emph{observation} error
+$\tilde x_i$, handled by $L_{\mathrm{obs}}$, and the \emph{communication} error $e_i$, handled by
+the triggering (a separation-principle argument). For $C=I$ the observer becomes trivial
+($\hat x_i\equiv x_i$) and the full-state protocol is recovered exactly.
+
+\paragraph{Results (Fig.~\ref{fig:output}).} We use the oscillator with $C=[1\ 0]$ (only the position
+is measured, not the velocity) and observer poles $\{-3,-4\}$. The figure has three panels. The left
+one shows the outputs $y_i$: they synchronise onto the common oscillation exactly as in the
+full-state case, even though only the position is measured. The centre panel shows the observation
+error $\norm{x_i-\hat x_i}$ of each agent on a logarithmic axis: it decays as a straight line from
+order one down to machine precision ($\approx 8.88\times 10^{-16}$), the numerical signature that
+$A-L_{\mathrm{obs}}C$ is Hurwitz and the estimates track the true states, as in \eqref{eq:obs-err}.
+The right panel shows the state disagreement $\norm{x-\bar x}_F$, again a straight line on the log
+axis, decaying to $\approx 2\times 10^{-7}$. The key point is that the two error panels decay
+\emph{independently}: the observation error (centre), governed by $L_{\mathrm{obs}}$, and the
+consensus error (right), governed by the triggering. This is the separation principle in action, and
+it shows that output consensus is achieved with output-only measurement, at a cost of $1044$ triggers
+(per agent $208,183,223,225,205$), comparable to the full-state case.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figs/fig_output_consensus.png}
+\caption{Observer-based output consensus with output-only measurement $y_i=Cx_i$. Left: the outputs
+synchronize. Centre: the observation error $\norm{x_i-\hat x_i}$ decays to machine precision. Right:
+the state disagreement converges ($\sim 2\times 10^{-7}$).}
+\label{fig:output}
+\end{figure}
+
+\FloatBarrier
+\section{Conclusions}
+We designed and implemented an event-triggered consensus controller for general linear dynamics and
+compared it against continuous control. Following a single logical thread (network Laplacian
+$\to$ eigenvalue decoupling $\to$ Riccati gain $\to$ event-triggering $\to$ extensions), the
+model-based protocol with a decentralized triggering rule reaches consensus (asymptotic, or bounded
+with Zeno exclusion) while reducing communication by orders of magnitude; the predictive model is
+markedly superior to the ZOH on unstable dynamics ($180$ against $20\,956$ transmissions). The sweep over
+$\sigma$ quantifies the trade-off between communication saving and convergence speed, which is the
+core of the required comparison. A dedicated analysis of the two cost axes shows an asymmetry that
+is easy to overlook: for the single integrator event-triggering cuts both communication and
+computation, whereas for general LTI the model-based scheme cuts communication but not computation,
+and the held-control variant does the opposite. Finally, the output-only case was solved
+(\S\ref{sec:output}) by combining a local observer with event-triggered consensus on the estimates,
+achieving output consensus with the same communication efficiency.
+
+\begin{thebibliography}{9}
+\bibitem{garcia2014} E.~Garcia, Y.~Cao, D.~W.~Casbeer,
+``Decentralized event-triggered consensus with general linear dynamics'',
+\emph{Automatica}, 50(10):2633--2640, 2014.
+\bibitem{dimarogonas2012} D.~V.~Dimarogonas, E.~Frazzoli, K.~H.~Johansson,
+``Distributed event-triggered control for multi-agent systems'',
+\emph{IEEE Trans.\ Autom.\ Control}, 57(5):1291--1297, 2012.
+\bibitem{isidori2017} A.~Isidori,
+\emph{Lectures in Feedback Design for Multivariable Systems},
+Springer, 2017 (Ch.~5).
+\end{thebibliography}
+
+\end{document}
