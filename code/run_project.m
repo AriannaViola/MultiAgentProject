@@ -1,6 +1,6 @@
 %% 
-%  PROGETTO 3 - Consenso event-triggered per dinamiche lineari generali
-%  Driver principale: esegue i tre esperimenti, produce figure e metriche.
+%  PROGETTO 3 : Consenso event-triggered per dinamiche lineari generali
+%  Driver: esegue i tre esperimenti, produce figure e metriche.
 %
 %  Riferimenti:
 %   [G] Garcia, Cao, Casbeer, Automatica 2014   (protocollo, Th.2, Th.3)
@@ -47,7 +47,7 @@ plot(et.t, Yet.'); grid on; xlabel('t [s]'); title('Outputs y_i = C x_i (ET)');
 %% figura eventi: raster a barrette + zoom + istogramma inter-event
 figure('Name','Eventi','Position',[100 100 1200 380]);
 
-% pannello 1: raster completo (ogni barretta verticale = un evento)
+% pannello 1: raster completo (ogni barretta verticale è un evento)
 subplot(1,3,1); hold on;
 for i = 1:N
     te = et.trig{i}(:).';                       % istanti di evento dell'agente i
@@ -71,17 +71,17 @@ grid on; ylim([0.5 N+0.5]); yticks(1:N);
 xlim([0 tz]); xlabel('t [s]'); ylabel('agent');
 title(sprintf('Zoom [0, %g] s: discrete events', tz));
 
-% pannello 3: istogramma inter-event (massa lontana da 0 = no Zeno)
+% pannello 3: istogramma inter-event (massa lontana da 0 significa no Zeno)
 iet = [];
 for i = 1:N
-    iet = [iet, diff(et.trig{i}(:)).'];          %#ok<AGROW>  forza a RIGA
+    iet = [iet, diff(et.trig{i}(:)).'];          
 end
-iet = iet(iet > 0);                              % scarta eventuali dt nulli/negativi
+iet = iet(iet > 0);                              
 
 subplot(1,3,3); cla;
 if ~isempty(iet)
     hH = histogram(iet, 25, 'FaceColor',[0.2 0.2 0.2], 'EdgeColor','w');
-    hold on;                                     % <-- senza questo la riga cancella l'istogramma
+    hold on;                                    
     hL = xline(min(iet), 'r--', 'LineWidth', 1.5);   % tau_min > 0
     hold off;
     legend([hH hL], {'inter-event','\tau_{min} > 0'}, 'Location','northeast');
@@ -108,7 +108,7 @@ P_paper = [ 4.8436  5.4783 -1.1082;       % P fornita nel paper [G]
             5.4783  7.0514 -1.4299;
            -1.1082 -1.4299  0.3778];
 g2 = design_gain(cfg2, [], [], P_paper);
-% stessa regola di trigger (Th.3 anti-Zeno), cambia SOLO il modello
+% stessa regola di trigger (Teorema 3 anti-Zeno), cambia SOLO il modello
 em = sim_event_triggered(cfg2, g2, struct('rule','garcia_zeno','model','model','rho',0.5,'phi',0.3));
 ez = sim_event_triggered(cfg2, g2, struct('rule','garcia_zeno','model','zoh','rho',0.5,'phi',0.3));
 fprintf('\n[instabili] trasmissioni model-based=%s (tot %d)\n', mat2str(em.counts(:).'), sum(em.counts));
@@ -176,7 +176,7 @@ set(gca,'XTickLabel',{'continuous','event-triggered'});
 ylabel('log'); legend('communication','computation');
 title('Communication and computation (single-integrator)');
 
-% (b) oscillatore (LTI generale): confronto a tre - tabella a console
+% (b) oscillatore (LTI generale): confronto a tre 
 cfgO = make_config('oscillator'); gO = design_gain(cfgO);
 stepsO = round(cfgO.T/1e-3); NO = cfgO.N;
 e_mb5  = sim_event_triggered(cfgO, gO, struct('rule','garcia','model','model','rho',0.5));
