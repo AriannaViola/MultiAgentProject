@@ -1,5 +1,5 @@
 %% 
-%  PROGETTO 3 : Consenso event-triggered per dinamiche lineari generali
+%  PROGETTO Multi Agent : Consenso event-triggered per dinamiche lineari generali
 %  Driver: esegue i tre esperimenti, produce figure e metriche.
 %
 %  Riferimenti:
